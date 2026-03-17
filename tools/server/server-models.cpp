@@ -462,6 +462,7 @@ void server_models::load_models() {
                 /* progress      */ {},
                 /* exit_code     */ 0,
                 /* stop_timeout  */ DEFAULT_STOP_TIMEOUT,
+                /* hidden        */ false,
                 /* multimodal    */ mtmd_caps{false, false},
                 // /* need_download */ false,
             };
@@ -469,6 +470,14 @@ void server_models::load_models() {
         }
         apply_stop_timeout();
         log_available_models();
+
+        // handle custom hidden option
+        for (auto & [name, inst] : mapping) {
+            std::string val;
+            if (inst.meta.preset.get_option(COMMON_ARG_PRESET_HIDDEN, val)) {
+                inst.meta.hidden = common_arg_utils::is_truthy(val);
+            }
+        }
 
         std::vector<std::string> models_to_load;
         for (const auto & [name, inst] : mapping) {
@@ -635,6 +644,7 @@ void server_models::load_models() {
                     /* progress      */ {},
                     /* exit_code     */ 0,
                     /* stop_timeout  */ DEFAULT_STOP_TIMEOUT,
+                    /* hidden        */ false,
                     /* multimodal    */ mtmd_caps{false, false},
                     // /* need_download */ false,
                 };
@@ -1716,6 +1726,9 @@ void server_models_routes::init_routes() {
         auto all_models = models.get_all_meta();
         std::time_t t = std::time(0);
         for (const auto & meta : all_models) {
+            if (meta.hidden) {
+                continue;
+            }
             json status {
                 {"value",  server_model_status_to_string(meta.status)},
                 {"args",   meta.args},
