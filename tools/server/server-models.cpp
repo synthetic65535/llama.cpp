@@ -436,6 +436,11 @@ void server_models::load_models() {
         return p.options;
     };
 
+    auto get_hidden = [](const common_preset & preset) {
+        std::string val;
+        return preset.get_option(COMMON_ARG_PRESET_HIDDEN, val) && common_arg_utils::is_truthy(val);
+    };
+
     // Phase 2: acquire the lock once for all mapping mutations.
     // We temporarily release it only when calling functions that acquire it internally
     // (unload, load) or when joining threads (the monitoring thread calls update_status
@@ -463,7 +468,8 @@ void server_models::load_models() {
                 /* exit_code     */ 0,
                 /* stop_timeout  */ DEFAULT_STOP_TIMEOUT,
                 /* multimodal    */ mtmd_caps{false, false},
-                // /* need_download */ false,
+                /* need_download */ false,
+                /* hidden        */ get_hidden(preset),
             };
             add_model(std::move(meta));
         }
@@ -577,6 +583,7 @@ void server_models::load_models() {
             if (it == final_presets.end()) continue; // erased above
 
             inst.meta.preset = it->second;
+            inst.meta.hidden = get_hidden(inst.meta.preset);
 
             // re-parse aliases, then validate against other models
             std::set<std::string> new_aliases;
@@ -636,7 +643,8 @@ void server_models::load_models() {
                     /* exit_code     */ 0,
                     /* stop_timeout  */ DEFAULT_STOP_TIMEOUT,
                     /* multimodal    */ mtmd_caps{false, false},
-                    // /* need_download */ false,
+                    /* need_download */ false,
+                    /* hidden        */ get_hidden(preset),
                 };
                 add_model(std::move(meta));
                 newly_added.push_back(name);
@@ -1716,6 +1724,9 @@ void server_models_routes::init_routes() {
         auto all_models = models.get_all_meta();
         std::time_t t = std::time(0);
         for (const auto & meta : all_models) {
+            if (meta.hidden) {
+                continue;
+            }
             json status {
                 {"value",  server_model_status_to_string(meta.status)},
                 {"args",   meta.args},
