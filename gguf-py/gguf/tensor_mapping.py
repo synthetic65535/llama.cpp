@@ -67,10 +67,12 @@ class TensorNameMap:
 
         # Position embeddings
         MODEL_TENSOR.POS_EMBD: (
-            "transformer.wpe",                 # gpt2
-            "embeddings.position_embeddings",  # bert
-            "wpe",                             # gpt2
-            "model.embed_positions",           # rugpt3xl
+            "transformer.wpe",                          # gpt2
+            "embeddings.position_embeddings",           # bert
+            "model.encoder.embed_positions.weight",     # nllb
+            "model.decoder.embed_positions.weight",     # nllb
+            "wpe",                                      # gpt2
+            "model.embed_positions",                    # rugpt3xl
         ),
 
         # Output
@@ -1133,23 +1135,28 @@ class TensorNameMap:
         ),
 
         MODEL_TENSOR.DEC_ATTN_NORM: (
-            "decoder.block.{bid}.layer.0.layer_norm", # t5
+            "decoder.block.{bid}.layer.0.layer_norm",          # t5
+            "model.decoder.layers.{bid}.self_attn_layer_norm", # nllb
         ),
 
         MODEL_TENSOR.DEC_ATTN_Q: (
             "decoder.block.{bid}.layer.0.SelfAttention.q", # t5
+            "model.decoder.layers.{bid}.self_attn.q_proj", # nllb
         ),
 
         MODEL_TENSOR.DEC_ATTN_K: (
             "decoder.block.{bid}.layer.0.SelfAttention.k", # t5
+            "model.decoder.layers.{bid}.self_attn.k_proj", # nllb
         ),
 
         MODEL_TENSOR.DEC_ATTN_V: (
             "decoder.block.{bid}.layer.0.SelfAttention.v", # t5
+            "model.decoder.layers.{bid}.self_attn.v_proj", # nllb
         ),
 
         MODEL_TENSOR.DEC_ATTN_OUT: (
-            "decoder.block.{bid}.layer.0.SelfAttention.o", # t5
+            "decoder.block.{bid}.layer.0.SelfAttention.o",   # t5
+            "model.decoder.layers.{bid}.self_attn.out_proj", # nllb
         ),
 
         MODEL_TENSOR.DEC_ATTN_REL_B: (
@@ -1157,23 +1164,28 @@ class TensorNameMap:
         ),
 
         MODEL_TENSOR.DEC_CROSS_ATTN_NORM: (
-            "decoder.block.{bid}.layer.1.layer_norm", # t5
+            "decoder.block.{bid}.layer.1.layer_norm",             # t5
+            "model.decoder.layers.{bid}.encoder_attn_layer_norm", # nllb
         ),
 
         MODEL_TENSOR.DEC_CROSS_ATTN_Q: (
-            "decoder.block.{bid}.layer.1.EncDecAttention.q", # t5
+            "decoder.block.{bid}.layer.1.EncDecAttention.q",  # t5
+            "model.decoder.layers.{bid}.encoder_attn.q_proj", # nllb
         ),
 
         MODEL_TENSOR.DEC_CROSS_ATTN_K: (
-            "decoder.block.{bid}.layer.1.EncDecAttention.k", # t5
+            "decoder.block.{bid}.layer.1.EncDecAttention.k",  # t5
+            "model.decoder.layers.{bid}.encoder_attn.k_proj", # nllb
         ),
 
         MODEL_TENSOR.DEC_CROSS_ATTN_V: (
-            "decoder.block.{bid}.layer.1.EncDecAttention.v", # t5
+            "decoder.block.{bid}.layer.1.EncDecAttention.v",  # t5
+            "model.decoder.layers.{bid}.encoder_attn.v_proj", # nllb
         ),
 
         MODEL_TENSOR.DEC_CROSS_ATTN_OUT: (
-            "decoder.block.{bid}.layer.1.EncDecAttention.o", # t5
+            "decoder.block.{bid}.layer.1.EncDecAttention.o",    # t5
+            "model.decoder.layers.{bid}.encoder_attn.out_proj", # nllb
         ),
 
         MODEL_TENSOR.DEC_CROSS_ATTN_REL_B: (
@@ -1181,7 +1193,8 @@ class TensorNameMap:
         ),
 
         MODEL_TENSOR.DEC_FFN_NORM: (
-            "decoder.block.{bid}.layer.2.layer_norm", # t5
+            "decoder.block.{bid}.layer.2.layer_norm",       # t5
+            "model.decoder.layers.{bid}.final_layer_norm",  # nllb
         ),
 
         MODEL_TENSOR.DEC_FFN_GATE: (
@@ -1191,34 +1204,42 @@ class TensorNameMap:
         MODEL_TENSOR.DEC_FFN_UP: (
             "decoder.block.{bid}.layer.2.DenseReluDense.wi",   # t5
             "decoder.block.{bid}.layer.2.DenseReluDense.wi_1", # flan-t5
+            "model.decoder.layers.{bid}.fc1",                  # nllb
         ),
 
         MODEL_TENSOR.DEC_FFN_DOWN: (
-            "decoder.block.{bid}.layer.2.DenseReluDense.wo", # t5
+            "decoder.block.{bid}.layer.2.DenseReluDense.wo",   # t5
+            "model.decoder.layers.{bid}.fc2",                  # nllb
         ),
 
         MODEL_TENSOR.DEC_OUTPUT_NORM: (
-            "decoder.final_layer_norm", # t5
+            "decoder.final_layer_norm",       # t5
+            "model.decoder.final_layer_norm", # nllb
         ),
 
         MODEL_TENSOR.ENC_ATTN_NORM: (
-            "encoder.block.{bid}.layer.0.layer_norm", # t5
+            "encoder.block.{bid}.layer.0.layer_norm",          # t5
+            "model.encoder.layers.{bid}.self_attn_layer_norm", # nllb
         ),
 
         MODEL_TENSOR.ENC_ATTN_Q: (
             "encoder.block.{bid}.layer.0.SelfAttention.q", # t5
+            "model.encoder.layers.{bid}.self_attn.q_proj", # nllb
         ),
 
         MODEL_TENSOR.ENC_ATTN_K: (
             "encoder.block.{bid}.layer.0.SelfAttention.k", # t5
+            "model.encoder.layers.{bid}.self_attn.k_proj", # nllb
         ),
 
         MODEL_TENSOR.ENC_ATTN_V: (
             "encoder.block.{bid}.layer.0.SelfAttention.v", # t5
+            "model.encoder.layers.{bid}.self_attn.v_proj", # nllb
         ),
 
         MODEL_TENSOR.ENC_ATTN_OUT: (
-            "encoder.block.{bid}.layer.0.SelfAttention.o", # t5
+            "encoder.block.{bid}.layer.0.SelfAttention.o",   # t5
+            "model.encoder.layers.{bid}.self_attn.out_proj", # nllb
         ),
 
         MODEL_TENSOR.ENC_ATTN_REL_B: (
@@ -1226,7 +1247,8 @@ class TensorNameMap:
         ),
 
         MODEL_TENSOR.ENC_FFN_NORM: (
-            "encoder.block.{bid}.layer.1.layer_norm", # t5
+            "encoder.block.{bid}.layer.1.layer_norm",       # t5
+            "model.encoder.layers.{bid}.final_layer_norm",  # nllb
         ),
 
         MODEL_TENSOR.ENC_FFN_GATE: (
@@ -1236,10 +1258,17 @@ class TensorNameMap:
         MODEL_TENSOR.ENC_FFN_UP: (
             "encoder.block.{bid}.layer.1.DenseReluDense.wi",   # t5
             "encoder.block.{bid}.layer.1.DenseReluDense.wi_1", # flan-t5
+            "model.encoder.layers.{bid}.fc1",                  # nllb
         ),
 
         MODEL_TENSOR.ENC_FFN_DOWN: (
-            "encoder.block.{bid}.layer.1.DenseReluDense.wo", # t5
+            "encoder.block.{bid}.layer.1.DenseReluDense.wo",   # t5
+            "model.encoder.layers.{bid}.fc2",                  # nllb
+        ),
+
+        MODEL_TENSOR.ENC_OUTPUT_NORM: (
+            "encoder.final_layer_norm",       # t5
+            "model.encoder.final_layer_norm", # nllb
         ),
 
         MODEL_TENSOR.VISEXP_UP: (

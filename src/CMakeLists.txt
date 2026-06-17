@@ -14,6 +14,7 @@ add_library(llama
             llama-adapter.cpp
             llama-arch.cpp
             llama-batch.cpp
+            beam-search/beam-search.cpp
             llama-chat.cpp
             llama-context.cpp
             llama-cparams.cpp

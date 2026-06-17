@@ -16,6 +16,7 @@
 *.lastModified
 *.log
 *.metallib
+*.npy
 *.o
 *.so
 *.swp
