@@ -1,0 +1,134 @@
+name: Sync with upstream llama.cpp
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Every 6 hours
+  workflow_dispatch: # Manual trigger
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: master
+          fetch-depth: 0
+          token: ${{ secrets.PAT }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add Upstream
+        run: git remote add upstream https://github.com/ggml-org/llama.cpp
+
+      - name: Fetch Upstream
+        run: git fetch upstream master
+
+      - name: Stage Sync Script
+        run: |
+          cp .github/scripts/sync-upstream-kilo.sh "$RUNNER_TEMP/sync-upstream-kilo.sh"
+          chmod +x "$RUNNER_TEMP/sync-upstream-kilo.sh"
+
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
+      - name: Install mergiraf
+        run: cargo binstall -y mergiraf
+
+      - name: Configure mergiraf merge driver
+        run: |
+          git config merge.conflictstyle diff3
+          git config merge.mergiraf.name mergiraf
+          git config merge.mergiraf.driver 'mergiraf merge --git %O %A %B -s %S -x %X -y %Y -p %P -l %L'
+          for e in c h cpp cc cxx hpp hh hxx py; do
+            echo "*.$e merge=mergiraf"
+          done >> .git/info/attributes
+
+      - name: Restore rerere cache
+        id: rerere_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .git/rr-cache
+          key: rerere-cache-${{ github.run_id }}
+          restore-keys: |
+            rerere-cache-
+
+      - name: Enable rerere
+        run: |
+          git config rerere.enabled true
+          git config rerere.autoupdate true
+
+      - name: Rebase from Upstream
+        id: rebase
+        continue-on-error: true
+        run: git rebase upstream/master
+
+      - name: Install Kilo CLI
+        if: steps.rebase.outcome == 'failure'
+        run: npm install -g @kilocode/cli
+
+      - name: Resolve Conflicts
+        if: steps.rebase.outcome == 'failure'
+        env:
+          KILO_API_KEY: ${{ secrets.KILO_API_KEY }}
+          KILO_MODEL: ${{ vars.KILO_MODEL }}
+        run: bash "$RUNNER_TEMP/sync-upstream-kilo.sh" resolve-conflicts
+
+      - name: Configure Build
+        id: configure
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          cmake -B build -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=OFF -DLLAMA_CURL=OFF 2>&1 | tee configure.log
+
+      - name: Build
+        id: build
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          cmake --build build -j"$(nproc)" 2>&1 | tee build.log
+
+      - name: Install Kilo CLI (for build fix)
+        if: ${{ always() && (steps.configure.outcome == 'failure' || steps.build.outcome == 'failure') }}
+        run: command -v kilo || npm install -g @kilocode/cli
+
+      - name: Fix Build Errors
+        id: fix_build
+        if: ${{ always() && (steps.configure.outcome == 'failure' || steps.build.outcome == 'failure') }}
+        continue-on-error: true
+        env:
+          KILO_API_KEY: ${{ secrets.KILO_API_KEY }}
+          KILO_MODEL: ${{ vars.KILO_MODEL }}
+        run: bash "$RUNNER_TEMP/sync-upstream-kilo.sh" fix-build
+
+      - name: Stop Before Push If Preflight Failed
+        if: ${{ always() && (steps.configure.outcome == 'failure' || steps.build.outcome == 'failure') && steps.fix_build.outcome != 'success' }}
+        run: |
+          echo "Configure/build failed and the automated build fix did not complete successfully; refusing to push."
+          exit 1
+
+      - name: Ensure No Uncommitted Changes
+        run: bash "$RUNNER_TEMP/sync-upstream-kilo.sh" verify-clean
+
+      - name: Push Changes
+        run: git push origin master --force-with-lease
+
+      - name: Trigger Release Workflow
+        run: |
+          gh workflow run release.yml --ref master --repo ${{ github.repository }} -f create_release=true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save rerere cache
+        if: ${{ always() && steps.rerere_cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .git/rr-cache
+          key: rerere-cache-${{ github.run_id }}

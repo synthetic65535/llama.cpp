@@ -13,7 +13,7 @@ int main(int argc, char ** argv) {
 
     params.n_predict = 128;
 
-    if (!common_params_parse(argc, argv, params, LLAMA_EXAMPLE_NLLB)) {
+    if (!common_params_parse(argc, argv, params, LLAMA_EXAMPLE_COMMON)) {
         return 1;
     }
 
