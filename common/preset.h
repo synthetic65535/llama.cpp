@@ -42,6 +42,16 @@ struct common_preset {
     // merge another preset into this one, overwriting existing options
     void merge(const common_preset & other);
 
+    // return a string that uniquely identifies the physical model file
+    // two presets with the same model_id point to the same physical model
+    std::string get_model_id() const;
+
+    // return a JSON string of sampling defaults from a preset
+    // also handles --reasoning → chat_template_kwargs.enable_thinking
+    // if base is provided, any parameter present in base but missing in this preset
+    // will be explicitly reset to its system default in the resulting JSON.
+    std::string to_json_sampling(const common_preset * base = nullptr) const;
+
     // apply preset options to common_params
     // optionally specify handled_keys to only apply a subset of options (identified by their env), if empty, apply all options
     void apply_to_params(common_params & params, const std::set<std::string> & handled_keys = std::set<std::string>()) const;

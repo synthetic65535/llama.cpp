@@ -55,12 +55,12 @@ class ServerProcess:
     model_hf_repo: str | None = "ggml-org/models"
     model_hf_file: str | None = "tinyllamas/stories260K.gguf"
     model_alias: str = "tinyllama-2"
-    temperature: float = 0.8
-    seed: int = 42
-    offline: bool = False
 
     # custom options
     model_alias: str | None = None
+    temperature: float = 0.8
+    seed: int = 42
+    offline: bool = False
     model_tags: str | None = None
     model_url: str | None = None
     model_file: str | None = None
@@ -90,8 +90,8 @@ class ServerProcess:
     pooling: str | None = None
     api_key: str | None = None
     models_dir: str | None = None
-    models_max: int | None = None
     models_preset: str | None = None
+    models_max: int | None = None
     no_models_autoload: bool | None = None
     lora_files: List[str] | None = None
     enable_ctx_shift: int | None = False
@@ -146,11 +146,11 @@ class ServerProcess:
             self.server_host,
             "--port",
             self.server_port,
-            "--temp",
-            self.temperature,
-            "--seed",
-            self.seed,
         ]
+        if self.temperature is not None:
+            server_args.extend(["--temp", self.temperature])
+        if self.seed is not None:
+            server_args.extend(["--seed", self.seed])
         if self.offline:
             server_args.append("--offline")
         if self.model_file:
@@ -165,10 +165,10 @@ class ServerProcess:
             server_args.extend(["--hf-file", self.model_hf_file])
         if self.models_dir:
             server_args.extend(["--models-dir", self.models_dir])
-        if self.models_max is not None:
-            server_args.extend(["--models-max", self.models_max])
         if self.models_preset:
             server_args.extend(["--models-preset", self.models_preset])
+        if self.models_max is not None:
+            server_args.extend(["--models-max", self.models_max])
         if self.n_batch:
             server_args.extend(["--batch-size", self.n_batch])
         if self.n_ubatch:

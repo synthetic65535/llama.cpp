@@ -4,6 +4,8 @@
 #include "log.h"
 #include "download.h"
 
+#include <nlohmann/json.hpp>
+
 #include <fstream>
 #include <sstream>
 #include <filesystem>
@@ -137,6 +139,120 @@ void common_preset::merge(const common_preset & other) {
     for (const auto & [opt, val] : other.options) {
         options[opt] = val; // overwrite existing options
     }
+}
+
+std::string common_preset::get_model_id() const {
+    std::string id;
+    for (const char * env : {"LLAMA_ARG_MODEL", "LLAMA_ARG_MODEL_URL", "LLAMA_ARG_HF_REPO", "LLAMA_ARG_HF_FILE"}) {
+        std::string val;
+        if (get_option(env, val) && !val.empty()) {
+            id += env;
+            id += ":";
+            id += std::to_string(val.size());
+            id += ":";
+            id += val;
+            id += ";";
+        }
+    }
+    return id;
+}
+
+struct sparam_info {
+    std::string json_key;
+    std::string default_val;
+};
+
+// mapping from first CLI arg name of sampling params to the JSON body key and system default value
+static const std::map<std::string, sparam_info> sparam_to_json = {
+    {"--temp",               {"temperature",       "0.8"}},
+    {"--top-k",              {"top_k",             "40"}},
+    {"--top-p",              {"top_p",             "0.95"}},
+    {"--min-p",              {"min_p",             "0.05"}},
+    {"--repeat-penalty",     {"repeat_penalty",    "1.0"}},
+    {"--presence-penalty",   {"presence_penalty",  "0.0"}},
+    {"--frequency-penalty",  {"frequency_penalty", "0.0"}},
+    {"--repeat-last-n",      {"repeat_last_n",     "64"}},
+    {"--top-nsigma",         {"top_n_sigma",       "-1.0"}},
+    {"--xtc-probability",    {"xtc_probability",   "0.0"}},
+    {"--xtc-threshold",      {"xtc_threshold",     "0.1"}},
+    {"--typical",            {"typical_p",         "1.0"}},
+    {"--dry-multiplier",     {"dry_multiplier",    "0.0"}},
+    {"--dry-base",           {"dry_base",          "1.75"}},
+    {"--dry-allowed-length", {"dry_allowed_length", "2"}},
+    {"--dry-penalty-last-n", {"dry_penalty_last_n", "-1"}},
+    {"--mirostat",           {"mirostat",           "0"}},
+    {"--mirostat-tau",       {"mirostat_tau",       "5.0"}},
+    {"--mirostat-eta",       {"mirostat_eta",       "0.1"}},
+    {"--seed",               {"seed",               "-1"}},
+};
+
+std::string common_preset::to_json_sampling(const common_preset * base) const {
+    using json = nlohmann::ordered_json;
+    json result = json::object();
+
+    auto inject_opt = [&](const common_arg & opt, const std::string & val) {
+        if (opt.args.empty()) return;
+        const std::string first_arg = opt.args[0];
+        if (opt.is_sampling) {
+            auto it = sparam_to_json.find(first_arg);
+            if (it != sparam_to_json.end()) {
+                try {
+                    result[it->second.json_key] = json::parse(val);
+                } catch (...) {
+                    result[it->second.json_key] = val;
+                }
+            }
+        } else if (first_arg == "-rea") {
+            if (!common_arg_utils::is_autoy(val)) {
+                if (!result.contains("chat_template_kwargs")) {
+                    result["chat_template_kwargs"] = json::object();
+                }
+                result["chat_template_kwargs"]["enable_thinking"] = common_arg_utils::is_truthy(val);
+            }
+        }
+    };
+
+    // 1. inject everything from this preset
+    for (const auto & [opt, val] : options) {
+        inject_opt(opt, val);
+    }
+
+    // 2. if base is provided, check for parameters that are in base but NOT in this preset
+    // and reset them to system defaults.
+    if (base) {
+        for (const auto & [opt, val] : base->options) {
+            if (opt.args.empty()) continue;
+            const std::string first_arg = opt.args[0];
+
+            // check if this parameter is missing in the current (target) preset
+            bool is_missing = true;
+            for (const auto & [target_opt, target_val] : options) {
+                if (!target_opt.args.empty() && target_opt.args[0] == first_arg) {
+                    is_missing = false;
+                    break;
+                }
+            }
+
+            if (is_missing) {
+                if (opt.is_sampling) {
+                    auto it = sparam_to_json.find(first_arg);
+                    if (it != sparam_to_json.end()) {
+                        result[it->second.json_key] = json::parse(it->second.default_val);
+                    }
+                } else if (first_arg == "-rea") {
+                    // if target has reasoning missing (auto) but base has it set,
+                    // we should probably force it to 'true' to ensure we don't
+                    // stay stuck in an 'off' state from the active instance.
+                    if (!result.contains("chat_template_kwargs")) {
+                        result["chat_template_kwargs"] = json::object();
+                    }
+                    result["chat_template_kwargs"]["enable_thinking"] = true;
+                }
+            }
+        }
+    }
+
+    return result.dump();
 }
 
 void common_preset::apply_to_params(common_params & params, const std::set<std::string> & handled_keys) const {
